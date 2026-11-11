@@ -1,6 +1,8 @@
 package com.lingkarmas.app.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -20,6 +22,11 @@ import com.lingkarmas.app.ui.theme.*
 fun HomeScreen(onOrder: (Long) -> Unit, onSeeAll: () -> Unit) {
     var cat by remember { mutableStateOf("Semua") }
     val orders = Repo.orders
+    // Mengambil daftar produk terlaris secara reaktif
+    val bestSellers = remember(Repo.products.size, orders.size) {
+        Repo.getBestSellers(5)
+    }
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically) {
@@ -46,16 +53,44 @@ fun HomeScreen(onOrder: (Long) -> Unit, onSeeAll: () -> Unit) {
                 }
             }
         }
+
+        // Section Produk Best Seller (Horizontal Scroll)
+        if (bestSellers.isNotEmpty()) {
+            Row(
+                Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Produk Best Seller", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                TextButton(onClick = onSeeAll) {
+                    Text("Semua", fontWeight = FontWeight.Bold)
+                }
+            }
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(bestSellers) { p ->
+                    val soldCount = Repo.getProductSalesCount(p.id)
+                    BestSellerCard(p = p, soldCount = soldCount) {
+                        onOrder(p.id)
+                    }
+                }
+            }
+        }
+
         Text("Kategori", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold,
             modifier = Modifier.padding(top = 24.dp, bottom = 12.dp))
         ChipRow(Repo.kategori, cat) { cat = it }
+
         Row(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Produk terbaru", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+            Text("Produk lainnya", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
             TextButton(onClick = onSeeAll) { Text("Lihat semua", fontWeight = FontWeight.Bold) }
         }
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Repo.products.filter { cat == "Semua" || it.kategori == cat }.take(2).forEach { p ->
+            Repo.products.filter { cat == "Semua" || it.kategori == cat }.take(4).forEach { p ->
                 ProductCard(p) { onOrder(p.id) }
             }
         }

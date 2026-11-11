@@ -123,6 +123,39 @@ object Repo {
         loadProducts()
     }
 
+    // ---------- BEST SELLER ----------
+    fun getBestSellers(limit: Int = 5): List<Product> {
+        if (!::helper.isInitialized) return emptyList()
+        val salesCount = mutableMapOf<Long, Int>()
+        try {
+            helper.readableDatabase.rawQuery(
+                "SELECT product_id, SUM(jumlah) as total FROM orders GROUP BY product_id ORDER BY total DESC",
+                null
+            ).use { c ->
+                while (c.moveToNext()) {
+                    salesCount[c.getLong(0)] = c.getInt(1)
+                }
+            }
+        } catch (_: Exception) {}
+
+        // Mengurutkan produk berdasarkan total pesanan terbanyak.
+        // Jika belum ada pesanan, default urutan produk tetap ditampilkan agar beranda tidak kosong.
+        return products.sortedByDescending { salesCount[it.id] ?: 0 }.take(limit)
+    }
+
+    fun getProductSalesCount(productId: Long): Int {
+        if (!::helper.isInitialized) return 0
+        try {
+            helper.readableDatabase.rawQuery(
+                "SELECT SUM(jumlah) FROM orders WHERE product_id=?",
+                arrayOf(productId.toString())
+            ).use { c ->
+                if (c.moveToFirst()) return c.getInt(0)
+            }
+        } catch (_: Exception) {}
+        return 0
+    }
+
     // ---------- PESANAN ----------
     fun loadOrders() {
         val u = user

@@ -4,6 +4,7 @@ import androidx.compose.runtime.remember
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -21,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.ContentScale
@@ -130,6 +132,103 @@ fun ProductCard(p: Product, onAdd: () -> Unit) {
                     shape = RoundedCornerShape(14.dp),
                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = Navy)
                 ) { Icon(Icons.Default.Add, contentDescription = "Pesan ${p.nama}") }
+            }
+        }
+    }
+}
+
+@Composable
+fun BestSellerCard(
+    p: Product,
+    soldCount: Int = 0,
+    onClick: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier
+            .width(170.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .clickable { onClick() }
+    ) {
+        Column(Modifier.padding(10.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(110.dp)
+            ) {
+                ProductImage(p.foto, Modifier.fillMaxSize())
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Gold,
+                    modifier = Modifier
+                        .padding(6.dp)
+                        .align(Alignment.TopStart)
+                ) {
+                    Text(
+                        text = "Best Seller",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Navy,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            Text(
+                text = p.nama,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Text(
+                text = p.kategori,
+                color = Muted,
+                fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(Modifier.height(6.dp))
+
+            Text(
+                text = rupiah(p.harga),
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 13.sp,
+                color = Navy
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (soldCount > 0) "$soldCount terjual" else "Stok ${p.stok}",
+                    fontSize = 11.sp,
+                    color = if (p.stok <= 5 && soldCount == 0) Color(0xFF7A5200) else Muted,
+                    fontWeight = FontWeight.Medium
+                )
+
+                FilledIconButton(
+                    onClick = onClick,
+                    modifier = Modifier.size(32.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Navy)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Pesan ${p.nama}",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }
