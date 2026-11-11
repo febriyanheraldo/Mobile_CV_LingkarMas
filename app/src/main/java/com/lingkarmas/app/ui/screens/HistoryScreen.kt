@@ -37,6 +37,7 @@ fun HistoryScreen() {
         Spacer(Modifier.height(16.dp))
         if (list.isEmpty()) Text("Belum ada pesanan.", color = Muted, fontSize = 14.sp)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 16.dp)) {
+            items(list, key = { it.id }) { OrderCard(it, { o -> edit = o }, { o -> batal = o }) }
         }
     }
 
