@@ -1,6 +1,6 @@
+
 package com.lingkarmas.app.ui
 
-import androidx.compose.runtime.remember
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,8 +37,13 @@ import com.lingkarmas.app.R
 @Composable
 fun LogoRing(modifier: Modifier = Modifier) {
     Image(
-        painterResource(R.drawable.logo_lingkarmas), "Logo CV. Lingkar Mas",
-        modifier.size(56.dp).clip(RoundedCornerShape(14.dp)).background(Color.White).padding(6.dp),
+        painter = painterResource(R.drawable.logo_lingkarmas),
+        contentDescription = "Logo CV. Lingkar Mas",
+        modifier = modifier
+            .size(56.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White)
+            .padding(6.dp),
         contentScale = ContentScale.Fit
     )
 }
@@ -45,41 +51,82 @@ fun LogoRing(modifier: Modifier = Modifier) {
 @Composable
 fun ProductImage(foto: String, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
+
     val base = modifier.clip(RoundedCornerShape(14.dp))
+
     val bitmap = remember(foto) {
-        if (foto.startsWith("/")) BitmapFactory.decodeFile(foto)?.asImageBitmap() else null
+        if (foto.startsWith("/")) {
+            BitmapFactory.decodeFile(foto)?.asImageBitmap()
+        } else null
     }
+
     val resId = remember(foto) {
-        if (foto.startsWith("/")) 0 else ctx.resources.getIdentifier(foto, "drawable", ctx.packageName)
+        if (foto.startsWith("/")) 0
+        else ctx.resources.getIdentifier(foto, "drawable", ctx.packageName)
     }
+
     when {
-        bitmap != null -> Image(bitmap, null, base, contentScale = ContentScale.Crop)
-        resId != 0 -> Image(painterResource(resId), null, base, contentScale = ContentScale.Crop)
-        else -> Box(base.background(Brush.linearGradient(listOf(PhA, PhB))))
+        bitmap != null -> Image(
+            bitmap,
+            contentDescription = null,
+            modifier = base,
+            contentScale = ContentScale.Crop
+        )
+
+        resId != 0 -> Image(
+            painterResource(resId),
+            contentDescription = null,
+            modifier = base,
+            contentScale = ContentScale.Crop
+        )
+
+        else -> Box(
+            base.background(Brush.linearGradient(listOf(PhA, PhB)))
+        )
     }
 }
 
 @Composable
-fun GoldButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun GoldButton(
+    text: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
     Button(
         onClick = onClick,
         modifier = modifier.fillMaxWidth().height(52.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Gold, contentColor = Navy)
-    ) { Text(text, fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Gold,
+            contentColor = Navy
+        )
+    ) {
+        Text(text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+    }
 }
 
 @Composable
-fun ChipRow(items: List<String>, selected: String, onSelect: (String) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+fun ChipRow(
+    items: List<String>,
+    selected: String,
+    onSelect: (String) -> Unit
+) {
+    Row(
+        Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         items.forEach {
             FilterChip(
-                selected = it == selected, onClick = { onSelect(it) },
-                label = { Text(it, fontWeight = FontWeight.SemiBold) },
+                selected = it == selected,
+                onClick = { onSelect(it) },
+                label = {
+                    Text(it, fontWeight = FontWeight.SemiBold)
+                },
                 shape = RoundedCornerShape(18.dp),
                 colors = FilterChipDefaults.filterChipColors(
                     containerColor = Color.White,
-                    selectedContainerColor = Navy, selectedLabelColor = Color.White
+                    selectedContainerColor = Navy,
+                    selectedLabelColor = Color.White
                 )
             )
         }
@@ -96,8 +143,13 @@ fun statusColors(s: String): Pair<Color, Color> = when (s) {
 @Composable
 fun StatusChip(text: String, bg: Color, fg: Color) {
     Text(
-        text, color = fg, fontSize = 12.sp, fontWeight = FontWeight.Bold,
-        modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(bg)
+        text,
+        color = fg,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(bg)
             .padding(horizontal = 10.dp, vertical = 5.dp)
     )
 }
@@ -110,28 +162,60 @@ fun ProductCard(p: Product, onAdd: () -> Unit) {
         elevation = CardDefaults.cardElevation(2.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             ProductImage(p.foto, Modifier.size(84.dp))
 
-            Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
-                Text(p.nama, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text(p.spesifikasi, color = Muted, fontSize = 12.sp)
+            Column(
+                Modifier.weight(1f).padding(horizontal = 14.dp)
+            ) {
+                Text(
+                    p.nama,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                )
+
+                Text(
+                    p.spesifikasi,
+                    color = Muted,
+                    fontSize = 12.sp
+                )
+
                 Spacer(Modifier.height(8.dp))
-                Text(rupiah(p.harga), fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+
+                Text(
+                    rupiah(p.harga),
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 15.sp
+                )
             }
+
             Column(horizontalAlignment = Alignment.End) {
                 val low = p.stok <= 5
+
                 StatusChip(
                     if (low) "Stok menipis" else "Stok ${p.stok}",
                     if (low) Color(0xFFFFF1CC) else Color(0xFFE3F4EC),
                     if (low) Color(0xFF7A5200) else Color(0xFF0B5E4D)
                 )
+
                 Spacer(Modifier.height(10.dp))
+
                 FilledIconButton(
-                    onClick = onAdd, modifier = Modifier.size(44.dp),
+                    onClick = onAdd,
+                    modifier = Modifier.size(44.dp),
                     shape = RoundedCornerShape(14.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Navy)
-                ) { Icon(Icons.Default.Add, contentDescription = "Pesan ${p.nama}") }
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = Navy
+                    )
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Pesan ${p.nama}"
+                    )
+                }
             }
         }
     }
@@ -141,7 +225,8 @@ fun ProductCard(p: Product, onAdd: () -> Unit) {
 fun BestSellerCard(
     p: Product,
     soldCount: Int = 0,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onAdd: () -> Unit = onClick
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
@@ -159,6 +244,7 @@ fun BestSellerCard(
                     .height(110.dp)
             ) {
                 ProductImage(p.foto, Modifier.fillMaxSize())
+
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = Gold,
@@ -167,11 +253,14 @@ fun BestSellerCard(
                         .align(Alignment.TopStart)
                 ) {
                     Text(
-                        text = "Best Seller",
+                        "Best Seller",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Navy,
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                        modifier = Modifier.padding(
+                            horizontal = 7.dp,
+                            vertical = 3.dp
+                        )
                     )
                 }
             }
@@ -179,7 +268,7 @@ fun BestSellerCard(
             Spacer(Modifier.height(10.dp))
 
             Text(
-                text = p.nama,
+                p.nama,
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
                 maxLines = 1,
@@ -187,17 +276,25 @@ fun BestSellerCard(
             )
 
             Text(
-                text = p.kategori,
+                p.kategori,
                 color = Muted,
                 fontSize = 11.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
 
+            Text(
+                p.deskripsi,
+                color = Muted,
+                fontSize = 11.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
             Spacer(Modifier.height(6.dp))
 
             Text(
-                text = rupiah(p.harga),
+                rupiah(p.harga),
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 13.sp,
                 color = Navy
@@ -211,17 +308,21 @@ fun BestSellerCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (soldCount > 0) "$soldCount terjual" else "Stok ${p.stok}",
+                    if (soldCount > 0) "$soldCount terjual" else "Stok ${p.stok}",
                     fontSize = 11.sp,
-                    color = if (p.stok <= 5 && soldCount == 0) Color(0xFF7A5200) else Muted,
+                    color = if (p.stok <= 5 && soldCount == 0) {
+                        Color(0xFF7A5200)
+                    } else Muted,
                     fontWeight = FontWeight.Medium
                 )
 
                 FilledIconButton(
-                    onClick = onClick,
+                    onClick = onAdd,
                     modifier = Modifier.size(32.dp),
                     shape = RoundedCornerShape(10.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Navy)
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = Navy
+                    )
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
