@@ -25,10 +25,17 @@ import com.lingkarmas.app.data.rupiah
 import com.lingkarmas.app.ui.GoldButton
 import com.lingkarmas.app.ui.theme.*
 import com.lingkarmas.app.ui.ProductImage
+import kotlinx.coroutines.launch
 
 @Composable
 fun OrderScreen(productId: Long, onBack: () -> Unit, onDone: () -> Unit) {
-    val p = Repo.products.first { it.id == productId }
+    val p = Repo.products.firstOrNull { it.id == productId }
+    if (p == null) {
+        LaunchedEffect(Unit) { onBack() }
+        return
+    }
+    val scope = rememberCoroutineScope()
+    var sending by remember { mutableStateOf(false) }
     var qty by remember { mutableIntStateOf(1) }
     var alamat by remember { mutableStateOf("") }
     var showOk by remember { mutableStateOf(false) }
@@ -48,7 +55,7 @@ fun OrderScreen(productId: Long, onBack: () -> Unit, onDone: () -> Unit) {
                     ProductImage(p.foto, Modifier.size(84.dp))
                     Column(Modifier.padding(start = 14.dp)) {
                         Text(p.nama, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Text(p.spesifikasi, color = Muted, fontSize = 12.sp)
+                        Text(p.ringkas, color = Muted, fontSize = 12.sp)
                         Spacer(Modifier.height(8.dp))
                         Text("Stok tersedia: ${p.stok}", color = Color(0xFF0B5E4D),
                             fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -96,10 +103,21 @@ fun OrderScreen(productId: Long, onBack: () -> Unit, onDone: () -> Unit) {
                     Text(it, color = Color(0xFF9B1C14), fontWeight = FontWeight.Bold,
                         fontSize = 13.sp, modifier = Modifier.padding(bottom = 10.dp))
                 }
-                GoldButton("Buat Pesanan") {
-                    val err = if (alamat.isBlank()) "Alamat pengiriman wajib diisi"
-                    else Repo.createOrder(p, qty, alamat.trim())
-                    if (err == null) showOk = true else alamatErr = err
+                GoldButton(
+                    if (sending) "Memproses..." else "Buat Pesanan",
+                    enabled = !sending
+                ) {
+                    if (alamat.isBlank()) {
+                        alamatErr = "Alamat pengiriman wajib diisi"
+                        return@GoldButton
+                    }
+                    alamatErr = null
+                    sending = true
+                    scope.launch {
+                        val err = Repo.createOrder(p, qty, alamat.trim())
+                        sending = false
+                        if (err == null) showOk = true else alamatErr = err
+                    }
                 }
             }
         }

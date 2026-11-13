@@ -24,9 +24,13 @@ import com.lingkarmas.app.ui.ChipRow
 import com.lingkarmas.app.ui.ProductCard
 import com.lingkarmas.app.ui.ProductImage
 import com.lingkarmas.app.ui.theme.*
+import com.lingkarmas.app.ui.DataStatus
 
 @Composable
 fun CatalogScreen(onOrder: (Long) -> Unit) {
+
+    LaunchedEffect(Unit) { Repo.loadProducts() }
+
     var query by remember { mutableStateOf("") }
     var cat by remember { mutableStateOf("Semua") }
     var selectedProduct by remember { mutableStateOf<Product?>(null) }
@@ -35,7 +39,7 @@ fun CatalogScreen(onOrder: (Long) -> Unit) {
         (cat == "Semua" || it.kategori == cat) &&
                 (
                         it.nama.contains(query, ignoreCase = true) ||
-                                it.deskripsi.contains(query, ignoreCase = true)
+                                it.spesifikasi.contains(query, ignoreCase = true)
                         )
     }
 
@@ -74,6 +78,11 @@ fun CatalogScreen(onOrder: (Long) -> Unit) {
         }
 
         Spacer(Modifier.height(16.dp))
+
+        DataStatus { Repo.loadProducts() }
+        if (list.isEmpty() && !Repo.loading && Repo.loadError == null) {
+            Text("Produk tidak ditemukan.", color = Muted, fontSize = 14.sp)
+        }
 
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -126,18 +135,6 @@ fun CatalogScreen(onOrder: (Long) -> Unit) {
                     )
 
                     HorizontalDivider()
-
-                    Text(
-                        "Deskripsi Produk",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
-
-                    Text(
-                        p.deskripsi.ifBlank { "Belum ada deskripsi produk." },
-                        fontSize = 13.sp,
-                        lineHeight = 20.sp
-                    )
 
                     Text(
                         "Spesifikasi",

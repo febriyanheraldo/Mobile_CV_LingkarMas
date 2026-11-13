@@ -33,6 +33,11 @@ import com.lingkarmas.app.data.Product
 import com.lingkarmas.app.data.rupiah
 import com.lingkarmas.app.ui.theme.*
 import com.lingkarmas.app.R
+import androidx.compose.ui.graphics.painter.ColorPainter
+import androidx.compose.runtime.rememberCoroutineScope
+import coil.compose.AsyncImage
+import com.lingkarmas.app.data.Repo
+import kotlinx.coroutines.launch
 
 @Composable
 fun LogoRing(modifier: Modifier = Modifier) {
@@ -51,26 +56,21 @@ fun LogoRing(modifier: Modifier = Modifier) {
 @Composable
 fun ProductImage(foto: String, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
-
     val base = modifier.clip(RoundedCornerShape(14.dp))
 
-    val bitmap = remember(foto) {
-        if (foto.startsWith("/")) {
-            BitmapFactory.decodeFile(foto)?.asImageBitmap()
-        } else null
-    }
-
     val resId = remember(foto) {
-        if (foto.startsWith("/")) 0
+        if (foto.isBlank() || foto.startsWith("http")) 0
         else ctx.resources.getIdentifier(foto, "drawable", ctx.packageName)
     }
 
     when {
-        bitmap != null -> Image(
-            bitmap,
+        foto.startsWith("http") -> AsyncImage(
+            model = foto,
             contentDescription = null,
             modifier = base,
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Crop,
+            placeholder = ColorPainter(PhA),
+            error = ColorPainter(PhB)
         )
 
         resId != 0 -> Image(
@@ -80,9 +80,7 @@ fun ProductImage(foto: String, modifier: Modifier = Modifier) {
             contentScale = ContentScale.Crop
         )
 
-        else -> Box(
-            base.background(Brush.linearGradient(listOf(PhA, PhB)))
-        )
+        else -> Box(base.background(Brush.linearGradient(listOf(PhA, PhB))))
     }
 }
 
@@ -90,10 +88,12 @@ fun ProductImage(foto: String, modifier: Modifier = Modifier) {
 fun GoldButton(
     text: String,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.fillMaxWidth().height(52.dp),
         shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.buttonColors(
@@ -178,7 +178,7 @@ fun ProductCard(p: Product, onAdd: () -> Unit) {
                 )
 
                 Text(
-                    p.spesifikasi,
+                    p.ringkas,
                     color = Muted,
                     fontSize = 12.sp
                 )
@@ -284,7 +284,7 @@ fun BestSellerCard(
             )
 
             Text(
-                p.deskripsi,
+                p.ringkas,
                 color = Muted,
                 fontSize = 11.sp,
                 maxLines = 2,
@@ -332,5 +332,32 @@ fun BestSellerCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun DataStatus(onRetry: suspend () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val err = Repo.loadError
+
+    if (err != null) {
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                err, color = Color(0xFF9B1C14), fontSize = 13.sp,
+                fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = { scope.launch { onRetry() } }) {
+                Text("Coba lagi", fontWeight = FontWeight.Bold)
+            }
+        }
+    } else if (Repo.loading) {
+        LinearProgressIndicator(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            color = Gold
+        )
     }
 }

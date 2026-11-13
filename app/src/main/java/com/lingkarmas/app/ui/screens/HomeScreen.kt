@@ -23,13 +23,17 @@ import com.lingkarmas.app.ui.*
 import com.lingkarmas.app.ui.theme.*
 @Composable
 fun HomeScreen(onOrder: (Long) -> Unit, onSeeAll: () -> Unit) {
+
+    LaunchedEffect(Unit) {
+        Repo.loadProducts()
+        Repo.loadOrders()
+    }
+
     var cat by remember { mutableStateOf("Semua") }
     var selectedProduct by remember { mutableStateOf<Product?>(null) }
 
     val orders = Repo.orders
-    val bestSellers = remember(Repo.products.size, orders.size) {
-        Repo.getBestSellers(5)
-    }
+    val bestSellers = Repo.getBestSellers(5)
 
     Column(
         Modifier.fillMaxSize()
@@ -53,6 +57,8 @@ fun HomeScreen(onOrder: (Long) -> Unit, onSeeAll: () -> Unit) {
         }
 
         Spacer(Modifier.height(20.dp))
+
+        DataStatus { Repo.loadProducts(); Repo.loadOrders() }
 
         Card(
             shape = RoundedCornerShape(20.dp),
@@ -164,12 +170,6 @@ fun HomeScreen(onOrder: (Long) -> Unit, onSeeAll: () -> Unit) {
                     Text(p.kategori, fontSize = 13.sp, color = Muted)
 
                     HorizontalDivider()
-
-                    Text("Deskripsi Produk", fontWeight = FontWeight.Bold)
-                    Text(
-                        p.deskripsi.ifBlank { "Belum ada deskripsi produk." },
-                        fontSize = 13.sp
-                    )
 
                     Text("Spesifikasi", fontWeight = FontWeight.Bold)
                     Text(p.spesifikasi, fontSize = 13.sp)

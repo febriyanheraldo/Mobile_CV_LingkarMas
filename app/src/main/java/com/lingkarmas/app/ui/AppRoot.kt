@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,6 +32,14 @@ fun AppRoot() {
         Tab("history", "Pesanan", Icons.Default.Receipt),
         Tab("profile", "Profil", Icons.Default.Person),
     )
+
+    // Sesi berakhir (token ditolak server) -> kembali ke login
+    LaunchedEffect(Repo.user, route) {
+        if (Repo.user == null && route != null && route != "login" && route != "register") {
+            nav.navigate("login") { popUpTo(0); launchSingleTop = true }
+        }
+    }
+
     Scaffold(
         containerColor = Bg,
         bottomBar = {
@@ -68,12 +77,8 @@ fun AppRoot() {
             }
             composable("history") { HistoryScreen() }
             composable("profile") {
-                ProfileScreen(
-                    onManageProducts = { nav.navigate("products") },
-                    onLogout = { nav.navigate("login") { popUpTo(0) } }
-                )
+                ProfileScreen(onLogout = { nav.navigate("login") { popUpTo(0) } })
             }
-            composable("products") { ProductManageScreen { nav.popBackStack() } }
         }
     }
 }

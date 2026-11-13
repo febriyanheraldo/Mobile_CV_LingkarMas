@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.lingkarmas.app.ui.GoldButton
 import com.lingkarmas.app.ui.theme.*
 import com.lingkarmas.app.data.Repo
+import kotlinx.coroutines.launch
 
 @Composable
 fun RegisterScreen(onBack: () -> Unit, onDone: () -> Unit) {
@@ -33,6 +34,8 @@ fun RegisterScreen(onBack: () -> Unit, onDone: () -> Unit) {
     var konfirmasi by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var showOk by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    var loading by remember { mutableStateOf(false) }
 
     fun validasi(): String? = when {
         nama.isBlank() || email.isBlank() || hp.isBlank() || pass.isBlank() -> "Semua kolom wajib diisi"
@@ -67,9 +70,22 @@ fun RegisterScreen(onBack: () -> Unit, onDone: () -> Unit) {
             error?.let {
                 Text(it, color = Color(0xFF9B1C14), fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
-            GoldButton("Daftar", Modifier.padding(top = 6.dp)) {
-                error = validasi() ?: Repo.register(nama, email, hp, pass)
-                if (error == null) showOk = true
+            GoldButton(
+                if (loading) "Memproses..." else "Daftar",
+                Modifier.padding(top = 6.dp),
+                enabled = !loading
+            ) {
+                val v = validasi()
+                if (v != null) {
+                    error = v
+                    return@GoldButton
+                }
+                loading = true
+                scope.launch {
+                    error = Repo.register(nama, email, hp, pass)
+                    loading = false
+                    if (error == null) showOk = true
+                }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 Text("Sudah punya akun? ", color = Muted, fontSize = 14.sp)

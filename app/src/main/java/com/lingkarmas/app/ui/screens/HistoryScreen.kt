@@ -22,20 +22,28 @@ import com.lingkarmas.app.ui.ChipRow
 import com.lingkarmas.app.ui.StatusChip
 import com.lingkarmas.app.ui.statusColors
 import com.lingkarmas.app.ui.theme.*
+import com.lingkarmas.app.ui.DataStatus
+import kotlinx.coroutines.launch
 
 @Composable
 fun HistoryScreen() {
+    val scope = rememberCoroutineScope()
     var filter by remember { mutableStateOf("Semua") }
     var edit by remember { mutableStateOf<Order?>(null) }
     var batal by remember { mutableStateOf<Order?>(null) }
+    var pesan by remember { mutableStateOf<String?>(null) }
     val list = Repo.orders.filter { filter == "Semua" || it.status == filter }
+
+    LaunchedEffect(Unit) { Repo.loadOrders() }   // status terbaru dari admin
 
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Text("Riwayat Pesanan", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold,
             modifier = Modifier.padding(top = 24.dp, bottom = 16.dp))
         ChipRow(listOf("Semua", "Menunggu", "Diproses", "Dikirim", "Ditolak"), filter) { filter = it }
         Spacer(Modifier.height(16.dp))
-        if (list.isEmpty()) Text("Belum ada pesanan.", color = Muted, fontSize = 14.sp)
+        DataStatus { Repo.loadOrders() }
+        if (list.isEmpty() && !Repo.loading && Repo.loadError == null)
+            Text("Belum ada pesanan.", color = Muted, fontSize = 14.sp)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 16.dp)) {
             items(list, key = { it.id }) { OrderCard(it, { o -> edit = o }, { o -> batal = o }) }
         }
@@ -49,23 +57,38 @@ fun HistoryScreen() {
             text = { OutlinedTextField(alamat, { alamat = it }, minLines = 2, modifier = Modifier.fillMaxWidth()) },
             confirmButton = {
                 TextButton(onClick = {
-                    if (alamat.isNotBlank()) { Repo.updateAlamat(o.id, alamat.trim()); edit = null }
+                    if (alamat.isNotBlank()) {
+                        val baru = alamat.trim()
+                        edit = null
+                        scope.launch { pesan = Repo.updateAlamat(o.id, baru) }
+                    }
                 }) { Text("Simpan") }
             },
             dismissButton = { TextButton(onClick = { edit = null }) { Text("Batal") } }
         )
     }
+
     batal?.let { o ->
         AlertDialog(
             onDismissRequest = { batal = null },
             title = { Text("Batalkan pesanan?", fontWeight = FontWeight.ExtraBold) },
             text = { Text("Pesanan ${o.kode} akan dihapus dan stok produk dikembalikan.") },
             confirmButton = {
-                TextButton(onClick = { Repo.cancelOrder(o); batal = null }) {
-                    Text("Ya, batalkan", color = Color(0xFF9B1C14))
-                }
+                TextButton(onClick = {
+                    batal = null
+                    scope.launch { pesan = Repo.cancelOrder(o) }
+                }) { Text("Ya, batalkan", color = Color(0xFF9B1C14)) }
             },
             dismissButton = { TextButton(onClick = { batal = null }) { Text("Tidak") } }
+        )
+    }
+
+    pesan?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { pesan = null },
+            title = { Text("Tidak dapat diproses", fontWeight = FontWeight.ExtraBold) },
+            text = { Text(msg) },
+            confirmButton = { TextButton(onClick = { pesan = null }) { Text("OK") } }
         )
     }
 }

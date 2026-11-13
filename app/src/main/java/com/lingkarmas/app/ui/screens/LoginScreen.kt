@@ -17,12 +17,15 @@ import com.lingkarmas.app.ui.GoldButton
 import com.lingkarmas.app.ui.LogoRing
 import com.lingkarmas.app.ui.theme.*
 import com.lingkarmas.app.data.Repo
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(onLogin: () -> Unit, onRegister: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    var loading by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(14.dp)
     val colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Navy, unfocusedBorderColor = Line)
 
@@ -48,8 +51,21 @@ fun LoginScreen(onLogin: () -> Unit, onRegister: () -> Unit) {
                 visualTransformation = PasswordVisualTransformation(),
                 shape = shape, colors = colors, modifier = Modifier.fillMaxWidth())
             error?.let { Text(it, color = Color(0xFF9B1C14), fontWeight = FontWeight.Bold, fontSize = 13.sp) }
-            GoldButton("Masuk", Modifier.padding(top = 6.dp)) {
-                if (Repo.login(email, pass)) { error = null; onLogin() } else error = "Email atau password salah"
+            GoldButton(
+                if (loading) "Memproses..." else "Masuk",
+                Modifier.padding(top = 6.dp),
+                enabled = !loading
+            ) {
+                if (email.isBlank() || pass.isBlank()) {
+                    error = "Email dan password wajib diisi"
+                    return@GoldButton
+                }
+                loading = true
+                scope.launch {
+                    val err = Repo.login(email, pass)
+                    loading = false
+                    if (err == null) { error = null; onLogin() } else error = err
+                }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 Text("Belum punya akun? ", color = Muted, fontSize = 14.sp)

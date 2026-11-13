@@ -18,12 +18,17 @@ import androidx.compose.ui.unit.sp
 import com.lingkarmas.app.data.Repo
 import com.lingkarmas.app.ui.GoldButton
 import com.lingkarmas.app.ui.theme.*
+import kotlinx.coroutines.launch
 
 @Composable
-fun ProfileScreen(onManageProducts: () -> Unit, onLogout: () -> Unit) {
+fun ProfileScreen(onLogout: () -> Unit) {
     val u = Repo.user
+    val scope = rememberCoroutineScope()
     var showEdit by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var errMsg by remember { mutableStateOf<String?>(null) }
+    val red = Color(0xFF9B1C14)
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally) {
@@ -47,15 +52,12 @@ fun ProfileScreen(onManageProducts: () -> Unit, onLogout: () -> Unit) {
             }
         }
         Spacer(Modifier.height(16.dp))
-        OutlinedButton(onClick = { showEdit = true }, shape = RoundedCornerShape(16.dp),
+        OutlinedButton(onClick = { errMsg = null; showEdit = true }, shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Ubah Profil", fontWeight = FontWeight.Bold) }
-        Spacer(Modifier.height(10.dp))
-        OutlinedButton(onClick = onManageProducts, shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Kelola Produk (demo)", fontWeight = FontWeight.Bold) }
         Spacer(Modifier.height(24.dp))
-        GoldButton("Keluar") { Repo.logout(); onLogout() }
-        TextButton(onClick = { showDelete = true }) {
-            Text("Hapus Akun", color = Color(0xFF9B1C14), fontWeight = FontWeight.Bold)
+        GoldButton("Keluar") { scope.launch { Repo.logout(); onLogout() } }
+        TextButton(onClick = { errMsg = null; showDelete = true }) {
+            Text("Hapus Akun", color = red, fontWeight = FontWeight.Bold)
         }
     }
 
@@ -69,24 +71,45 @@ fun ProfileScreen(onManageProducts: () -> Unit, onLogout: () -> Unit) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(nama, { nama = it }, label = { Text("Nama lengkap") }, singleLine = true)
                     OutlinedTextField(hp, { hp = it }, label = { Text("No. HP") }, singleLine = true)
+                    errMsg?.let { Text(it, color = red, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    if (nama.isNotBlank() && hp.isNotBlank()) { Repo.updateProfile(nama, hp); showEdit = false }
-                }) { Text("Simpan") }
+                TextButton(enabled = !busy, onClick = {
+                    if (nama.isNotBlank() && hp.isNotBlank()) {
+                        busy = true
+                        errMsg = null
+                        scope.launch {
+                            val err = Repo.updateProfile(nama, hp)
+                            busy = false
+                            if (err == null) showEdit = false else errMsg = err
+                        }
+                    }
+                }) { Text(if (busy) "Menyimpan..." else "Simpan") }
             },
             dismissButton = { TextButton(onClick = { showEdit = false }) { Text("Batal") } }
         )
     }
+
     if (showDelete) AlertDialog(
         onDismissRequest = { showDelete = false },
         title = { Text("Hapus akun?", fontWeight = FontWeight.ExtraBold) },
-        text = { Text("Akun beserta seluruh riwayat pesananmu akan dihapus permanen.") },
-        confirmButton = {
-            TextButton(onClick = { Repo.deleteAccount(); showDelete = false; onLogout() }) {
-                Text("Ya, hapus", color = Color(0xFF9B1C14))
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Akunmu akan dihapus permanen. Pesanan yang masih berstatus Menunggu akan dibatalkan, sedangkan pesanan lain tetap tercatat sebagai riwayat di toko.")
+                errMsg?.let { Text(it, color = red, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
             }
+        },
+        confirmButton = {
+            TextButton(enabled = !busy, onClick = {
+                busy = true
+                errMsg = null
+                scope.launch {
+                    val err = Repo.deleteAccount()
+                    busy = false
+                    if (err == null) { showDelete = false; onLogout() } else errMsg = err
+                }
+            }) { Text(if (busy) "Menghapus..." else "Ya, hapus", color = red) }
         },
         dismissButton = { TextButton(onClick = { showDelete = false }) { Text("Batal") } }
     )

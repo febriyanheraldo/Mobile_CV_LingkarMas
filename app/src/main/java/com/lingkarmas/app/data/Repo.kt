@@ -1,20 +1,16 @@
-
 package com.lingkarmas.app.data
 
-import android.content.ContentValues
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import java.security.MessageDigest
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import org.json.JSONArray
+import org.json.JSONException
+import org.json.JSONObject
 
 object Repo {
-    private lateinit var helper: DbHelper
     private lateinit var prefs: SharedPreferences
 
     val products = mutableStateListOf<Product>()
@@ -23,314 +19,242 @@ object Repo {
     var user by mutableStateOf<User?>(null)
         private set
 
+    /** true selama produk/pesanan sedang dimuat. */
+    var loading by mutableStateOf(false)
+        private set
+
+    /** Pesan error terakhir saat memuat data (null jika tidak ada). */
+    var loadError by mutableStateOf<String?>(null)
+        private set
+
     val kategori: List<String>
         get() = listOf("Semua") + products.map { it.kategori }.distinct()
 
+    private var active = 0
+
+    // ---------- SESI ----------
+
     fun init(context: Context) {
-        if (::helper.isInitialized) return
+        if (::prefs.isInitialized) return
 
-        helper = DbHelper(context.applicationContext)
-        prefs = context.applicationContext.getSharedPreferences(
-            "session", Context.MODE_PRIVATE
-        )
+        prefs = context.applicationContext.getSharedPreferences("session", Context.MODE_PRIVATE)
+        Api.token = prefs.getString("token", null)
 
-        loadProducts()
+        val cached = prefs.getString("user", null)
+        if (Api.token != null && cached != null) {
+            user = try { JSONObject(cached).toUser() } catch (_: Exception) { null }
+        }
+        if (user == null) clearSession()
+    }
 
-        val uid = prefs.getLong("uid", -1L)
-        if (uid != -1L) {
-            helper.readableDatabase.rawQuery(
-                "SELECT id,nama,email,hp FROM users WHERE id=?",
-                arrayOf(uid.toString())
-            ).use { c ->
-                if (c.moveToFirst()) {
-                    startSession(
-                        User(c.getLong(0), c.getString(1), c.getString(2), c.getString(3))
-                    )
-                }
-            }
+    private fun userJson(u: User) = JSONObject()
+        .put("id", u.id).put("nama", u.nama).put("email", u.email).put("hp", u.hp)
+        .toString()
+
+    private fun startSession(token: String, u: User) {
+        Api.token = token
+        user = u
+        prefs.edit().putString("token", token).putString("user", userJson(u)).apply()
+    }
+
+    private fun updateCachedUser(u: User) {
+        user = u
+        prefs.edit().putString("user", userJson(u)).apply()
+    }
+
+    private fun clearSession() {
+        Api.token = null
+        user = null
+        products.clear()
+        orders.clear()
+        loadError = null
+        if (::prefs.isInitialized) prefs.edit().clear().apply()
+    }
+
+    // ---------- PEMBANTU ----------
+
+    private class Res<T>(val data: T?, val error: String?)
+
+    /** 401 pada request berotorisasi mengakhiri sesi (layar otomatis kembali ke login). */
+    private fun fail(e: ApiException, authed: Boolean): String {
+        if (e.code == 401 && authed) clearSession()
+        return e.message
+    }
+
+    private suspend fun <T> attempt(authed: Boolean = true, block: suspend () -> T): Res<T> =
+        try {
+            Res(block(), null)
+        } catch (e: ApiException) {
+            Res(null, fail(e, authed))
+        } catch (e: JSONException) {
+            Res(null, "Respons server tidak dikenali")
+        }
+
+    private suspend fun <T> tracked(block: suspend () -> T): T {
+        active++
+        loading = true
+        try {
+            return block()
+        } finally {
+            active--
+            loading = active > 0
         }
     }
 
-    private fun hash(s: String) = MessageDigest.getInstance("SHA-256")
-        .digest(s.toByteArray())
-        .joinToString("") { "%02x".format(it) }
-
-    private fun today() =
-        SimpleDateFormat("dd MMM yyyy", Locale("id", "ID")).format(Date())
-
-    private fun startSession(u: User?) {
-        user = u
-        prefs.edit().putLong("uid", u?.id ?: -1L).apply()
-        loadOrders()
+    /** Jika server belum punya foto, pakai drawable lokal sesuai nama produk. */
+    private fun fotoFor(nama: String, url: String): String {
+        if (url.isNotBlank()) return url
+        val n = nama.lowercase()
+        return when {
+            "pump" in n || "pompa" in n -> "pump"
+            "roots" in n || "blower" in n -> "roots_blower"
+            "bearing" in n -> "bearing"
+            "seal" in n -> "oil_seal"
+            else -> ""
+        }
     }
+
+    private fun JSONObject.toUser() = User(getLong("id"), str("nama"), str("email"), str("hp"))
+
+    private fun JSONObject.toProduct() = Product(
+        id = getLong("id"),
+        nama = str("nama"),
+        kategori = str("kategori"),
+        deskripsi = "",
+        spesifikasi = str("spesifikasi"),
+        harga = optInt("harga"),
+        stok = optInt("stok"),
+        foto = fotoFor(str("nama"), str("foto_url")),
+        terjual = optInt("terjual")
+    )
+
+    private fun JSONObject.toOrder() = Order(
+        id = getLong("id"),
+        kode = str("kode"),
+        tanggal = str("tanggal"),
+        status = str("status"),
+        productId = optLong("product_id"),   // 0 jika produk sudah dihapus admin
+        produkNama = str("produk_nama"),
+        jumlah = optInt("jumlah"),
+        alamat = str("alamat"),
+        total = optInt("total")
+    )
 
     // ---------- USER ----------
 
-    fun register(nama: String, email: String, hp: String, pass: String): String? {
-        val mail = email.trim().lowercase()
+    /** Mengembalikan pesan error, atau null jika berhasil. */
+    suspend fun register(nama: String, email: String, hp: String, pass: String): String? =
+        attempt(authed = false) {
+            Api.call(
+                "POST", "register",
+                JSONObject()
+                    .put("nama", nama.trim())
+                    .put("email", email.trim().lowercase())
+                    .put("hp", hp.trim())
+                    .put("password", pass),
+                auth = false
+            )
+        }.error
 
-        helper.readableDatabase.rawQuery(
-            "SELECT id FROM users WHERE email=?", arrayOf(mail)
-        ).use {
-            if (it.moveToFirst()) return "Email sudah terdaftar"
-        }
-
-        helper.writableDatabase.insert(
-            "users", null,
-            ContentValues().apply {
-                put("nama", nama.trim())
-                put("email", mail)
-                put("hp", hp.trim())
-                put("password", hash(pass))
-            }
-        )
-
-        return null
-    }
-
-    fun login(email: String, pass: String): Boolean {
-        helper.readableDatabase.rawQuery(
-            "SELECT id,nama,email,hp FROM users WHERE email=? AND password=?",
-            arrayOf(email.trim().lowercase(), hash(pass))
-        ).use { c ->
-            if (c.moveToFirst()) {
-                startSession(
-                    User(c.getLong(0), c.getString(1), c.getString(2), c.getString(3))
+    /** Mengembalikan pesan error, atau null jika berhasil. */
+    suspend fun login(email: String, pass: String): String? =
+        attempt(authed = false) {
+            val res = JSONObject(
+                Api.call(
+                    "POST", "login",
+                    JSONObject().put("email", email.trim().lowercase()).put("password", pass),
+                    auth = false
                 )
-                return true
-            }
+            )
+            startSession(res.getString("token"), res.getJSONObject("user").toUser())
+        }.error
+
+    suspend fun logout() {
+        try {
+            Api.call("POST", "logout")
+        } catch (_: ApiException) {
+        } finally {
+            clearSession()
         }
-        return false
     }
 
-    fun logout() = startSession(null)
+    suspend fun updateProfile(nama: String, hp: String): String? =
+        attempt {
+            val res = JSONObject(
+                Api.call("PUT", "me", JSONObject().put("nama", nama.trim()).put("hp", hp.trim()))
+            )
+            updateCachedUser(res.toUser())
+        }.error
 
-    fun updateProfile(nama: String, hp: String) {
-        val u = user ?: return
-
-        helper.writableDatabase.update(
-            "users",
-            ContentValues().apply {
-                put("nama", nama.trim())
-                put("hp", hp.trim())
-            },
-            "id=?",
-            arrayOf(u.id.toString())
-        )
-
-        user = u.copy(nama = nama.trim(), hp = hp.trim())
-    }
-
-    fun deleteAccount() {
-        val u = user ?: return
-        val w = helper.writableDatabase
-
-        w.delete("orders", "user_id=?", arrayOf(u.id.toString()))
-        w.delete("users", "id=?", arrayOf(u.id.toString()))
-
-        startSession(null)
-    }
+    suspend fun deleteAccount(): String? =
+        attempt {
+            Api.call("DELETE", "me")
+            clearSession()
+        }.error
 
     // ---------- PRODUK ----------
 
-    fun loadProducts() {
-        val list = mutableListOf<Product>()
-
-        helper.readableDatabase.rawQuery(
-            "SELECT id,nama,kategori,deskripsi,spesifikasi,harga,stok,foto FROM products ORDER BY id",
-            null
-        ).use { c ->
-            while (c.moveToNext()) {
-                list.add(
-                    Product(
-                        c.getLong(0),
-                        c.getString(1),
-                        c.getString(2),
-                        c.getString(3),
-                        c.getString(4),
-                        c.getInt(5),
-                        c.getInt(6),
-                        c.getString(7)
-                    )
-                )
+    suspend fun loadProducts() {
+        if (user == null) return
+        loadError = null
+        val r = tracked {
+            attempt {
+                val arr = JSONArray(Api.call("GET", "products"))
+                (0 until arr.length()).map { arr.getJSONObject(it).toProduct() }
             }
         }
-
-        products.clear()
-        products.addAll(list)
+        r.data?.let { products.clear(); products.addAll(it) }
+        r.error?.let { loadError = it }
     }
 
-    fun saveProduct(p: Product) {
-        val cv = ContentValues().apply {
-            put("nama", p.nama)
-            put("kategori", p.kategori)
-            put("deskripsi", p.deskripsi)
-            put("spesifikasi", p.spesifikasi)
-            put("harga", p.harga)
-            put("stok", p.stok)
-            put("foto", p.foto)
-        }
+    // ---------- BEST SELLER (data `terjual` dari server) ----------
 
-        if (p.id == 0L) {
-            helper.writableDatabase.insert("products", null, cv)
-        } else {
-            helper.writableDatabase.update(
-                "products", cv, "id=?", arrayOf(p.id.toString())
-            )
-        }
+    fun getBestSellers(limit: Int = 5): List<Product> =
+        products.sortedByDescending { it.terjual }.take(limit)
 
-        loadProducts()
-    }
-
-    fun deleteProduct(id: Long) {
-        helper.writableDatabase.delete(
-            "products", "id=?", arrayOf(id.toString())
-        )
-        loadProducts()
-    }
-
-    // ---------- BEST SELLER ----------
-
-    fun getBestSellers(limit: Int = 5): List<Product> {
-        if (!::helper.isInitialized) return emptyList()
-
-        val salesCount = mutableMapOf<Long, Int>()
-
-        try {
-            helper.readableDatabase.rawQuery(
-                "SELECT product_id, SUM(jumlah) as total FROM orders GROUP BY product_id ORDER BY total DESC",
-                null
-            ).use { c ->
-                while (c.moveToNext()) {
-                    salesCount[c.getLong(0)] = c.getInt(1)
-                }
-            }
-        } catch (_: Exception) {}
-
-        return products.sortedByDescending {
-            salesCount[it.id] ?: 0
-        }.take(limit)
-    }
-
-    fun getProductSalesCount(productId: Long): Int {
-        if (!::helper.isInitialized) return 0
-
-        try {
-            helper.readableDatabase.rawQuery(
-                "SELECT SUM(jumlah) FROM orders WHERE product_id=?",
-                arrayOf(productId.toString())
-            ).use { c ->
-                if (c.moveToFirst()) return c.getInt(0)
-            }
-        } catch (_: Exception) {}
-
-        return 0
-    }
+    fun getProductSalesCount(productId: Long): Int =
+        products.firstOrNull { it.id == productId }?.terjual ?: 0
 
     // ---------- PESANAN ----------
 
-    fun loadOrders() {
-        val u = user
-        val list = mutableListOf<Order>()
-
-        if (u != null) {
-            helper.readableDatabase.rawQuery(
-                "SELECT id,tanggal,status,product_id,produk_nama,jumlah,alamat,total " +
-                        "FROM orders WHERE user_id=? ORDER BY id DESC",
-                arrayOf(u.id.toString())
-            ).use { c ->
-                while (c.moveToNext()) {
-                    list.add(
-                        Order(
-                            c.getLong(0),
-                            "LM-%04d".format(c.getLong(0)),
-                            c.getString(1),
-                            c.getString(2),
-                            c.getLong(3),
-                            c.getString(4),
-                            c.getInt(5),
-                            c.getString(6),
-                            c.getInt(7)
-                        )
-                    )
-                }
+    suspend fun loadOrders() {
+        if (user == null) return
+        loadError = null
+        val r = tracked {
+            attempt {
+                val arr = JSONArray(Api.call("GET", "orders"))
+                (0 until arr.length()).map { arr.getJSONObject(it).toOrder() }
             }
         }
-
-        orders.clear()
-        orders.addAll(list)
+        r.data?.let { orders.clear(); orders.addAll(it) }
+        r.error?.let { loadError = it }
     }
 
-    fun createOrder(p: Product, jumlah: Int, alamat: String): String? {
-        val u = user ?: return "Silakan login dulu"
-        val cur = products.firstOrNull { it.id == p.id }
-            ?: return "Produk tidak ditemukan"
-
-        if (jumlah > cur.stok) return "Stok tidak cukup"
-
-        val w = helper.writableDatabase
-        w.beginTransaction()
-
-        try {
-            w.insert(
-                "orders", null,
-                ContentValues().apply {
-                    put("tanggal", today())
-                    put("status", "Menunggu")
-                    put("user_id", u.id)
-                    put("product_id", cur.id)
-                    put("produk_nama", cur.nama)
-                    put("jumlah", jumlah)
-                    put("alamat", alamat)
-                    put("total", cur.harga * jumlah)
-                }
+    /** Total dihitung server. Error stok: "Stok tidak cukup". */
+    suspend fun createOrder(p: Product, jumlah: Int, alamat: String): String? {
+        val r = attempt {
+            Api.call(
+                "POST", "orders",
+                JSONObject().put("product_id", p.id).put("jumlah", jumlah).put("alamat", alamat)
             )
-
-            w.execSQL(
-                "UPDATE products SET stok = stok - ? WHERE id=?",
-                arrayOf<Any>(jumlah, cur.id)
-            )
-
-            w.setTransactionSuccessful()
-        } finally {
-            w.endTransaction()
         }
+        if (r.error != null) return r.error
 
-        loadProducts()
+        loadProducts()   // stok di katalog ikut berubah
         loadOrders()
         return null
     }
 
-    fun updateAlamat(orderId: Long, alamat: String) {
-        helper.writableDatabase.update(
-            "orders",
-            ContentValues().apply { put("alamat", alamat) },
-            "id=?",
-            arrayOf(orderId.toString())
-        )
-        loadOrders()
+    suspend fun updateAlamat(orderId: Long, alamat: String): String? {
+        val r = attempt { Api.call("PUT", "orders/$orderId", JSONObject().put("alamat", alamat)) }
+        loadOrders()     // sinkronkan juga saat gagal (status mungkin sudah diubah admin)
+        return r.error
     }
 
-    fun cancelOrder(o: Order) {
-        if (o.status != "Menunggu") return
-
-        val w = helper.writableDatabase
-        w.beginTransaction()
-
-        try {
-            w.delete("orders", "id=?", arrayOf(o.id.toString()))
-
-            w.execSQL(
-                "UPDATE products SET stok = stok + ? WHERE id=?",
-                arrayOf<Any>(o.jumlah, o.productId)
-            )
-
-            w.setTransactionSuccessful()
-        } finally {
-            w.endTransaction()
-        }
-
-        loadProducts()
+    suspend fun cancelOrder(o: Order): String? {
+        val r = attempt { Api.call("DELETE", "orders/${o.id}") }
+        if (r.error == null) loadProducts()
         loadOrders()
+        return r.error
     }
 }
