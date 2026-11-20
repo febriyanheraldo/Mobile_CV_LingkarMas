@@ -183,7 +183,7 @@ fun HomeScreen(onOrder: (Long) -> Unit, onSeeAll: () -> Unit) {
                         color = Navy
                     )
 
-                    Text("Stok tersedia: ${p.stok}", color = Muted)
+                    Text(if (p.stok > 0) "Stok tersedia: ${p.stok}" else "Stok habis, tersedia lewat pre-order", color = Muted)
                 }
             },
             confirmButton = {

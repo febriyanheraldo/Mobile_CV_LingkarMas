@@ -158,7 +158,7 @@ fun CatalogScreen(onOrder: (Long) -> Unit) {
                     )
 
                     Text(
-                        "Stok tersedia: ${p.stok}",
+                        if (p.stok > 0) "Stok tersedia: ${p.stok}" else "Stok habis, tersedia lewat pre-order",
                         fontSize = 13.sp,
                         color = if (p.stok <= 5) Color(0xFF9B1C14) else Muted
                     )

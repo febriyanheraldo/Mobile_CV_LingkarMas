@@ -193,12 +193,17 @@ fun ProductCard(p: Product, onAdd: () -> Unit) {
             }
 
             Column(horizontalAlignment = Alignment.End) {
-                val low = p.stok <= 5
+                val habis = p.stok <= 0
+                val low = p.stok in 1..5
 
                 StatusChip(
-                    if (low) "Stok menipis" else "Stok ${p.stok}",
-                    if (low) Color(0xFFFFF1CC) else Color(0xFFE3F4EC),
-                    if (low) Color(0xFF7A5200) else Color(0xFF0B5E4D)
+                    when {
+                        habis -> "Pre-Order"
+                        low -> "Stok menipis"
+                        else -> "Stok ${p.stok}"
+                    },
+                    if (habis || low) Color(0xFFFFF1CC) else Color(0xFFE3F4EC),
+                    if (habis || low) Color(0xFF7A5200) else Color(0xFF0B5E4D)
                 )
 
                 Spacer(Modifier.height(10.dp))
@@ -308,7 +313,7 @@ fun BestSellerCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    if (soldCount > 0) "$soldCount terjual" else "Stok ${p.stok}",
+                    if (soldCount > 0) "$soldCount terjual" else if (p.stok > 0) "Stok ${p.stok}" else "Pre-Order",
                     fontSize = 11.sp,
                     color = if (p.stok <= 5 && soldCount == 0) {
                         Color(0xFF7A5200)

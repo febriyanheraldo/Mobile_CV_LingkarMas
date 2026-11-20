@@ -16,7 +16,7 @@ object ApiConfig {
     // const val BASE_URL = "http://10.0.2.2:8000/api/"
 
     // HP asli (satu Wi-Fi dengan laptop): pakai IP laptop, contoh
-    const val BASE_URL = "http://192.168.0.101:8000/api/"
+    const val BASE_URL = "http://172.14.5.98:8000/api/"
 }
 
 class ApiException(val code: Int, override val message: String) : Exception(message)

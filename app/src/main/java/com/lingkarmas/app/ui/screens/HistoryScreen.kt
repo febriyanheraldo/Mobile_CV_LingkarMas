@@ -72,7 +72,7 @@ fun HistoryScreen() {
         AlertDialog(
             onDismissRequest = { batal = null },
             title = { Text("Batalkan pesanan?", fontWeight = FontWeight.ExtraBold) },
-            text = { Text("Pesanan ${o.kode} akan dihapus dan stok produk dikembalikan.") },
+            text = { Text("Pesanan ${o.kode} akan dibatalkan dan dihapus dari riwayatmu.") },
             confirmButton = {
                 TextButton(onClick = {
                     batal = null

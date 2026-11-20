@@ -39,14 +39,13 @@ fun OrderScreen(productId: Long, onBack: () -> Unit, onDone: () -> Unit) {
     var qty by remember { mutableIntStateOf(1) }
     var alamat by remember { mutableStateOf("") }
     var showOk by remember { mutableStateOf(false) }
-    var showErr by remember { mutableStateOf(false) }
     var alamatErr by remember { mutableStateOf<String?>(null) }
 
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
             Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Kembali") }
-                Text("Buat Pesanan", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Buat Pre-Order", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
             }
             Spacer(Modifier.height(12.dp))
             Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -57,8 +56,11 @@ fun OrderScreen(productId: Long, onBack: () -> Unit, onDone: () -> Unit) {
                         Text(p.nama, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                         Text(p.ringkas, color = Muted, fontSize = 12.sp)
                         Spacer(Modifier.height(8.dp))
-                        Text("Stok tersedia: ${p.stok}", color = Color(0xFF0B5E4D),
-                            fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(
+                            if (p.stok > 0) "Stok tersedia: ${p.stok}" else "Stok habis · Pre-Order",
+                            color = if (p.stok > 0) Color(0xFF0B5E4D) else Color(0xFF7A5200),
+                            fontWeight = FontWeight.Bold, fontSize = 12.sp
+                        )
                     }
                 }
             }
@@ -75,15 +77,17 @@ fun OrderScreen(productId: Long, onBack: () -> Unit, onDone: () -> Unit) {
                         OutlinedIconButton(onClick = { if (qty > 1) qty-- }, modifier = Modifier.size(44.dp),
                             shape = RoundedCornerShape(14.dp)) { Icon(Icons.Default.Remove, "Kurangi") }
                         Text("$qty", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-                        FilledIconButton(onClick = { if (qty < p.stok) qty++ else showErr = true },
+                        FilledIconButton(onClick = { if (qty < 999) qty++ },
                             modifier = Modifier.size(44.dp), shape = RoundedCornerShape(14.dp),
                             colors = IconButtonDefaults.filledIconButtonColors(containerColor = Navy)
                         ) { Icon(Icons.Default.Add, "Tambah") }
                     }
                 }
             }
-            if (showErr) Text("Stok tidak cukup", color = Color(0xFF9B1C14),
-                fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+            if (qty > p.stok) Text(
+                "Jumlah melebihi stok saat ini. Sisanya diproses sebagai pre-order dan menunggu stok masuk.",
+                color = Color(0xFF7A5200), fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp)
+            )
             Spacer(Modifier.height(14.dp))
             OutlinedTextField(alamat, { alamat = it }, label = { Text("Alamat pengiriman") },
                 shape = RoundedCornerShape(14.dp), minLines = 3,
@@ -124,8 +128,8 @@ fun OrderScreen(productId: Long, onBack: () -> Unit, onDone: () -> Unit) {
     }
     if (showOk) AlertDialog(
         onDismissRequest = {}, shape = RoundedCornerShape(24.dp),
-        title = { Text("Pesanan Berhasil", fontWeight = FontWeight.ExtraBold) },
-        text = { Text("Pesananmu sudah dikirim dan menunggu konfirmasi admin.") },
+        title = { Text("Pre-Order Berhasil", fontWeight = FontWeight.ExtraBold) },
+        text = { Text("Pre-order-mu sudah dikirim dan menunggu konfirmasi admin.") },
         confirmButton = { TextButton(onClick = { showOk = false; onDone() }) { Text("Lihat Riwayat") } }
     )
 }
