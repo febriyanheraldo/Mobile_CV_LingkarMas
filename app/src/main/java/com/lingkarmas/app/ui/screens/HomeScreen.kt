@@ -32,8 +32,12 @@ fun HomeScreen(onOrder: (Long) -> Unit, onSeeAll: () -> Unit) {
     var cat by remember { mutableStateOf("Semua") }
     var selectedProduct by remember { mutableStateOf<Product?>(null) }
 
+
     val orders = Repo.orders
-    val bestSellers = Repo.getBestSellers(5)
+
+    val bestSellers = remember(Repo.products.size, orders.size) {
+        Repo.getBestSellers(5)
+    }
 
     Column(
         Modifier.fillMaxSize()
